@@ -51,7 +51,7 @@ Graph::~Graph(void)
 }
 
 void Graph::FillMatrix(const vector<int>& src, const vector<int>& dst, const vector<double>& weight)
-{
+{cout << "fill!!!!!!!!!!\n";
 	int m = min(*min_element(src.begin(), src.end()), *min_element(dst.begin(), dst.end()));
 	if(m > 0)
 		m = 1;
@@ -123,7 +123,7 @@ void Graph::ReadFromEdgelist(const std::string& fname)
 		}
 	}
 	file.close();
-	FillModMatrix(src, dst, weight);
+	FillMatrix(src, dst, weight);
 }
 
 void Graph::ReadFromPajeck(const std::string& fname)
@@ -164,11 +164,12 @@ void Graph::ReadFromPajeck(const std::string& fname)
 		}
 	}
 	file.close();
-	FillModMatrix(src, dst, weight);
+	FillMatrix(src, dst, weight);
 }
 
 double Graph::EdgeWeight(int i, int j) const
 {
+	if(i >= m_matrix.size() || j >= m_matrix[0].size())cout << "error! in EdgeWeight(i, j)!";
 	return m_matrix[i][j];
 }
 
@@ -199,42 +200,111 @@ void Graph::CalcModMtrix()
 }
 
 //gary
-void Graph::CalcConCut()
+int Graph::numCommunity(const vector<int>& community) const
 {
-	if(!m_conCut.empty())
-		return;
-	
-	m_conCut.assign(m_communityNumber, 0.0);
-	m_conMatrix.assign(m_size, vector<double>(m_size, 0.0));
-	for(int i = 0; i < m_communityNumber; ++i){
-		vector<int> community;
-		vector<int> out_of_community;
-		double edgeWeight = 0.0;
-		double _edgeWeight = 0.0;
-		
-		for(int j = 0; j < m_size; ++j)
-			if(m_communities[j] == i)
-				community.push_back(j);
-			else
-				out_of_community.push_back(j);
-		
-		for(std::vector<int>::iterator it = community.begin(); it != community.end(); ++it)
-			for(int j = 0; j < m_size; ++j)
-				edgeWeight += m_matrix[*it][j];
-
-		for(std::vector<int>::iterator it = out_of_community.begin(); it != out_of_community.end(); ++it)
-			for(int j = 0; j < m_size; ++j)
-				_edgeWeight += m_matrix[*it][j];
-		
-		if(_edgeWeight > edgeWeight)_edgeWeight = edgeWeight;
-		
-		for(int j = 0; j < community.size(); ++j)
-			for(int k = 0; k < out_of_community.size(); ++k){
-				for(int k1 = 0; k1 < out_of_community.size(); ++k1)
-					m_conMatrix[community[j]][community[k]] += m_matrix[community[j]][community[k1]]/_edgeWeight;
-				m_conCut[i] += m_matrix[community[j]][community[k]]/_edgeWeight;
+	vector<int> num;
+	for(int i = 0; i < community.size(); ++i){
+		for(int j = 0; j < num.size() + num.size()==0; ++j){
+			if(num.size()==0)num.push_back(community[i]);
+			if(num[j] != community[i] && num.size() - 1 == j)num.push_back(community[i]);
+			else{
+				if(num[j] == community[i])break;
 			}
+		}
 	}
+	return num.size();
+}
+
+//gary
+/*
+vector<double> Graph::CalcConMtrix(const vector<int>& communityInd)
+{
+	
+	cout << "m_size = " << m_size << " communityInd.size() = " << communityInd.size() << endl; 
+	vector<double> m_conList;
+
+	m_conList.assign(m_size, 0.0);
+	vector<double> sumCs(communityNum, 0.0);
+	vector<double> sumMs(communityNum, 0.0);
+	double i_cs = 0.0;
+	double i_ms = 0.0;
+	
+	for(int i = 0; i < communityInd.size(); ++i){
+		i_cs = 0.0;
+		i_ms = 0.0;
+		
+		for(int j = 0; j < communityInd.size(); ++j){
+			if(communityInd[i] != communityInd[j]){
+				i_cs += m_matrix[i][j];
+			}else{
+				i_ms += m_matrix[i][j];
+			}
+		}
+		
+		m_conList[i] = i_cs;
+		sumCs[communityInd[i]] += i_cs;
+		sumMs[communityInd[i]] += i_ms;
+	}
+	
+	for(int i = 0; i < communityInd.size(); ++i){
+		m_conList[i] /= (2 * sumMs[communityInd[i]] + sumCs[communityInd[i]]);
+	}
+	cout << "haha\n";
+	return m_conList;
+}*/
+
+//TPR
+//for undirected graph : trivial
+//for directed graph : make every edge undirected
+double Graph::CalcTPRMtrix(const vector<int>& communityInd)
+{	
+	int numTriad = 0;
+	//calculate the number of triad node communityInd[i] participating in
+	for(int i = 0; i < communityInd.size(); ++i){
+		vector<int> neighbor;
+		//find neighbor of communityInd[i]
+		for(int j = 0; j < communityInd.size(); ++j){
+			if(i != j){
+				if(m_matrix[communityInd[i]][communityInd[j]]){
+					neighbor.push_back(communityInd[j]);
+				}
+				else if(m_matrix[communityInd[j]][communityInd[i]]){
+					neighbor.push_back(communityInd[j]);	
+				}
+			}
+		}
+		//find the number of pair of connected neighbors
+		for(int j = 0; j < neighbor.size(); ++j){
+			for(int k = j + 1; k < neighbor.size(); ++k){
+				if(m_matrix[neighbor[j]][neighbor[k]]){
+					++numTriad;
+				}
+				else if(m_matrix[neighbor[k]][neighbor[j]]){
+					++numTriad;	
+				}
+			}
+		}
+	}
+	
+	return numTriad / communityInd.size();
+}
+
+double Graph::CalcInDen(const vector<int>& communityInd)
+{	
+	int Ms = 0;
+	//calculate the number of triad node communityInd[i] participating in
+	for(int i = 0; i < communityInd.size(); ++i){
+		for(int j = 0; j < communityInd.size(); ++j){
+			if(m_matrix[communityInd[i]][communityInd[j]]){
+				++Ms;
+			}
+			if(m_matrix[communityInd[j]][communityInd[i]]){
+				++Ms;
+			}
+		}
+	}
+	
+	return Ms / (communityInd.size() * (communityInd.size() - 1));
 }
 
 void Graph::Print() const
@@ -290,14 +360,6 @@ double Graph::Modularity() const
 	return mod;
 }
 
-//gary
-double Graph::myConductance() const
-{
-	double con = 0;
-	for(int i = 0; i < m_conCut.size(); ++i)
-		con += m_conCut[i];
-	return con;
-}
 
 void Graph::PerformSplit(int origin, int dest, const vector<int>& split_communities)
 {
@@ -355,15 +417,6 @@ vector< vector<double> > Graph::GetModularitySubmatrix(const vector<int>& indice
 	return res;
 }
 
-//gary
-vector< vector<double> > Graph::GetmyConductanceSubmatrix(const vector<int>& indices) const
-{
-	vector< vector<double> > res(indices.size(), vector<double>(indices.size()));
-	for(int i = 0; i < indices.size(); ++i)
-		for(int j = 0; j < indices.size(); ++j)
-			res[i][j] = m_conMatrix[indices[i]][indices[j]];
-	return res;
-}
 
 vector<double> Graph::GetCorrectionVector(const vector<int>& origCommInd, const vector<int>& destCommInd) const
 {
@@ -371,15 +424,5 @@ vector<double> Graph::GetCorrectionVector(const vector<int>& origCommInd, const 
 	for(int i = 0; i < origCommInd.size(); ++i)
 		for(int j = 0; j < destCommInd.size(); ++j)
 			res[i] += m_modMatrix[destCommInd[j]][origCommInd[i]];
-	return res;
-}
-
-//gary
-vector<double> Graph::GetConCorrectionVector(const vector<int>& origCommInd, const vector<int>& destCommInd) const
-{
-	vector<double> res(origCommInd.size(), 0.0);
-	for(int i = 0; i < origCommInd.size(); ++i)
-		for(int j = 0; j < destCommInd.size(); ++j)
-			res[i] += m_conMatrix[destCommInd[j]][origCommInd[i]];
 	return res;
 }

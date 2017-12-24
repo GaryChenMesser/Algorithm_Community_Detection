@@ -35,7 +35,10 @@ public:
 	void ReadFromPajeck(const std::string& fname);
 	void CalcModMtrix();
 	//gary
-	void CalcConCut();
+	//void CalcConCut();
+	std::vector<double> CalcConMtrix(const std::vector<int>& communityNow);
+	double CalcTPRMtrix(const std::vector<int>& communityInd);
+	double CalcInDen(const std::vector<int>& communityInd);
 
 	int Size() const {return m_size;}
 	int CommunityNumber() const {return m_communityNumber;};
@@ -43,18 +46,18 @@ public:
 	bool IsCommunityEmpty(int comm) const;
 
 	double Modularity() const;
-	//gary
-	double myConductance() const;
 	std::vector< std::vector<double> > GetModularitySubmatrix(const std::vector<int>& indices) const;
 	//gary
-	std::vector< std::vector<double> > GetmyConductanceSubmatrix(const std::vector<int>& indices) const;
+	//std::vector< std::vector<double> > GetmyConductanceSubmatrix(const std::vector<int>& indices) const;
 	std::vector<double> GetCorrectionVector(const std::vector<int>& origCommInd, const std::vector<int>& destCommInd) const;
 	//gary
-	std::vector<double> GetConCorrectionVector(const std::vector<int>& origCommInd, const std::vector<int>& destCommInd) const;
+	//std::vector<double> GetConCorrectionVector(const std::vector<int>& origCommInd, const std::vector<int>& destCommInd) const;
 	
 	void SetCommunities(const std::vector<int>& new_communities, int number = -1);
 	std::vector<int> Communities() const {return m_communities;};
 	std::vector<int> CommunityIndices(int comm) const;
+	
+	int numCommunity(const std::vector<int>& community) const;
 
 	void PerformSplit(int origin, int dest, const std::vector<int>& split_communities);
 	bool DeleteCommunityIfEmpty(int comm);
@@ -72,9 +75,8 @@ private:
 	bool m_isOriented;
 	std::vector<std::vector<double> > m_matrix;
 	std::vector<std::vector<double> > m_modMatrix;
-	//gary
-	std::vector<std::vector<double> > m_conMatrix;
-	std::vector<double> m_conCut;
 	std::vector<int> m_communities;
+	//gary
+	//std::vector<double> m_conList;
 };
 
