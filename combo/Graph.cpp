@@ -309,6 +309,53 @@ double Graph::CalcInDen(const vector<int>& communityInd)
 	return Ms / (communityInd.size() * (communityInd.size() - 1));
 }
 
+double Graph::CalcInDen(const set<int>& communityInd)
+{	
+	double Ms = 0;
+	//calculate the number of triad node communityInd[i] participating in
+	for(set<int>::iterator i = communityInd.begin(); i != communityInd.end(); ++i){
+		for(set<int>::iterator j = communityInd.begin(); j != communityInd.end(); ++j){
+			if(m_matrix[*i][*j]){
+				++Ms;
+			}
+			if(m_matrix[*j][*i]){
+				++Ms;
+			}
+		}
+	}
+	if(communityInd.size() == 0)return 0;
+	if(communityInd.size() - 1 == 0)return 0;
+	return Ms / (communityInd.size() * (communityInd.size() - 1));
+}
+
+double Graph::InDen()
+{	
+	double inden = 0;
+	//calculate the number of triad node communityInd[i] participating in
+	for(size_t i = 0; i < m_communityNumber; ++i){
+		double Ms = 0;
+		int n = 0;
+		for(size_t j = 0; j < m_size; ++j){
+			for(size_t k = 0; k < m_size; ++k){
+				if(m_communities[j] == i){
+					++n;
+					if(m_communities[k] == i){
+						if(m_matrix[j][k]){
+							++Ms;
+						}
+						if(m_matrix[k][j]){
+							++Ms;
+						}
+					}
+				}
+			}
+		}
+		if(n != 1)inden += Ms / (n * (n - 1)) * n / m_size;
+	}
+
+	return inden;
+}
+
 void Graph::Print() const
 {
 	cout << "Matrix:" << endl;

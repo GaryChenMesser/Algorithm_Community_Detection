@@ -8,7 +8,7 @@ LFLAGS = -lm
 TARGET  = comboCPP
 
 HEADER  = Graph.h
-FILES = Graph.cc Main.cc
+FILES = Graph.cc Main_inden.cc 
 
 OBJECTS = $(FILES:.cc=.o)
 

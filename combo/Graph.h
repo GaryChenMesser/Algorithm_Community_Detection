@@ -39,6 +39,8 @@ public:
 	std::vector<double> CalcConMtrix(const std::vector<int>& communityNow);
 	double CalcTPRMtrix(const std::vector<int>& communityInd);
 	double CalcInDen(const std::vector<int>& communityInd);
+	double CalcInDen(const std::set<int>& communityInd);
+	double InDen();
 
 	int Size() const {return m_size;}
 	int CommunityNumber() const {return m_communityNumber;};
