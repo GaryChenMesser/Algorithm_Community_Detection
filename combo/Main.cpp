@@ -33,7 +33,8 @@ const bool debug_verify = false;
 
 
 #define INF 1000000000
-#define THRESHOLD 1e-6
+//#define THRESHOLD 1e-6
+#define THRESHOLD 0.1
 const int RAND_MAX2 = RAND_MAX >> 1;
 
 const double autoC1 = 2;
@@ -87,21 +88,16 @@ double ModGain(Graph& G, const vector< vector<double> >& Q, const vector<double>
 
 		vector<int> NewOrig;
 		vector<int> NewDest;
-cout << "checkmod\n";
 		for(size_t i = 0; i < communityInd.size(); ++i){
 			if(community[i])NewOrig.push_back(communityInd[i]);
 			else NewDest.push_back(communityInd[i]);
 		}
-cout << "checkmod1\n";		
 		double IndenOldOrig = G.CalcInDen(communityInd);
-		cout << "checkmod2\n";		
 
 		double IndenNewOrig = G.CalcInDen(NewOrig);
-		cout << "checkmod3\n";		
-
 		double IndenNewDest = G.CalcInDen(NewDest);
-cout << "checkmod2\n";
-		return IndenNewOrig * NewOrig.size() / n + IndenNewDest * NewDest.size() / n - IndenOldOrig;
+		
+		return IndenNewOrig * NewOrig.size() + IndenNewDest * NewDest.size();
 	}
 	
 	else{
@@ -130,132 +126,141 @@ cout << "checkmod2\n";
 double PerformKernighansShift(const vector< vector<double> >& Q, const vector<double>& correctionVector, const vector<int>& communitiesOld, vector<int>& communitiesNew, const vector<int>& community) //perform a split improvement using a Karnigan-Lin-style iterative shifts series
 {
 	if(Inden){
-		double g_max = 1;
+		double g_max = 0;
+		double g_max1 = 1;
 		vector<int> oldOrig;
 		vector<int> oldDest;
-cout << "community.size() = " << community.size() << endl;
-cout << "communitiesOld.size() = " << communitiesOld.size() << endl;
 
 		for(size_t i = 0; i < community.size(); ++i){
-			cout << community[i] << endl;
 			if(communitiesOld[i])oldOrig.push_back(community[i]);
 			else oldDest.push_back(community[i]);
 		}
-		cout << "oldOrig.size() = " << oldOrig.size() << endl;
-		cout << "oldDest.size() = " << oldDest.size() << endl;
 		double inden_gain0 = G.CalcInDen(oldOrig) * oldOrig.size() + G.CalcInDen(oldDest) * oldDest.size();
-cout << "kl1\n";
-		while(g_max > 0){
-			cout << "kl2\n";
+		//cout << "oldOrig.size() = " << oldOrig.size() << endl;
+		//cout << "oldDest.size() = " << oldDest.size() << endl;
+		//cout << "G.CalcInDen(oldOrig) = " << G.CalcInDen(oldOrig) << endl;
+		//cout << "G.CalcInDen(oldDest) = " << G.CalcInDen(oldDest) << endl;
+		//cout << "inden_gain0 = " << inden_gain0 << endl;
+		while(g_max1 - g_max > 0){
+			g_max1 = g_max;
 			g_max = 0;
 			vector<double> gv;
 			vector<int> mv;
 			//vector<int> bv;			
-cout << "oldOrig.size() = " << oldOrig.size() << endl;
-cout << "oldDest.size() = " << oldDest.size() << endl;
 			vector<int> tempOrig = oldOrig;
 			vector<int> tempDest = oldDest;
-			while(tempOrig.size() > 0 && tempDest.size() > 0){
-				cout << "while\n";
+			double minima1 = 100;
+			double minima2 = 100;
+			while(tempOrig.size() > 2 && tempDest.size() > 2){
 				vector<double> all_da;
 				vector<double> all_db;
-				for(size_t i = 0; i < tempOrig.size(); ++i){cout << tempOrig[i] << "Origi = " << i << endl;}
-				for(size_t i = 0; i < tempDest.size(); ++i){cout << tempDest[i] << "Desti = " << i << endl;}
 				for(size_t i = 0; i < tempOrig.size(); ++i){
 					double degree = 0;
-					cout << "tempOrig.size() = " << tempOrig.size() << endl;
-					cout << "check1\n";
-					for(size_t j = 0; j < tempOrig.size(); ++j){
-						cout << "ok1\n";
-						cout << "G.EdgeWeight(tempOrig[" << i << "], tempOrig[" << j << "]) = " << G.EdgeWeight(tempOrig[i], tempOrig[j]) << endl;
-						cout << "ok2\n";
-						degree -= G.EdgeWeight(tempOrig[i], tempOrig[j]) / tempOrig.size() / tempOrig.size();
-						cout << "ok3\n";
-					}
-					cout << "tempDest.size() = " << tempDest.size() << endl;
-					cout << "check2\n";
-					for(size_t j = 0; j < tempDest.size(); ++j){
-						cout << "ok1\n";
-						cout << "G.EdgeWeight(tempOrig[" << i << "], tempDest[" << j << "]) = " << G.EdgeWeight(tempOrig[i], tempDest[j]) << endl;
-						cout << "ok2\n";
-						degree += G.EdgeWeight(tempOrig[i], tempDest[j]) / tempDest.size() / tempDest.size();
-						cout << "ok3\n";
-					}cout << "check3\n";
+					for(size_t j = 0; j < tempOrig.size(); ++j)
+						degree -= G.EdgeWeight(tempOrig[i], tempOrig[j]);
+					degree /= ((tempOrig.size() - 2) * (tempOrig.size() - 1));
+					
+					for(size_t j = 0; j < tempDest.size(); ++j)
+						degree += G.EdgeWeight(tempOrig[i], tempDest[j]);
+					degree /= (tempDest.size() * (tempDest.size() + 1));
+					
 					all_da.push_back(degree);
 				}
-				cout << "degree = " << endl;
 				for(size_t i = 0; i < tempDest.size(); ++i){
 					double degree = 0;
-					for(size_t j = 0; j < tempDest.size(); ++j){
-						degree -= G.EdgeWeight(tempDest[i], tempDest[j]) / tempDest.size() / tempDest.size();
-					}
-					for(size_t j = 0; j < oldOrig.size(); ++j){
-						degree += G.EdgeWeight(tempDest[i], tempOrig[j]) / tempOrig.size() / tempOrig.size();
-					}
+					for(size_t j = 0; j < tempDest.size(); ++j)
+						degree -= G.EdgeWeight(tempDest[i], tempDest[j]);
+					degree /= ((tempDest.size() - 2) * (tempDest.size() - 1));
+					
+					for(size_t j = 0; j < oldOrig.size(); ++j)
+						degree += G.EdgeWeight(tempDest[i], tempOrig[j]);
+					degree /= (tempOrig.size() * (tempOrig.size() + 1));
+					
 					all_db.push_back(degree);
 				}
-				cout << "degree = " << endl;
-cout << "kl3\n";
 				vector<double>::iterator result1;
 				vector<double>::iterator result2;
 
 				result1 = max_element(all_da.begin(), all_da.end());
-				cout << *result1 << endl;
-				cout << "distance(all_da.begin(), result1)" << distance(all_da.begin(), result1) << endl;
-				cout << "tempOrig[distance(all_da.begin(), result1)]" << tempOrig[distance(all_da.begin(), result1)] << endl;
-				cout << "tempOrig.size() = " << tempOrig.size() << endl;
+				//cout << "result1 = " << *result1 << endl;
+				//cout << "distance(all_da.begin(), result1)" << distance(all_da.begin(), result1) << endl;
+				//cout << "tempOrig[distance(all_da.begin(), result1)]" << tempOrig[distance(all_da.begin(), result1)] << endl;
+				//cout << "tempOrig.size() = " << tempOrig.size() << endl;
 				result2 = max_element(all_db.begin(), all_db.end());
-				cout << *result2 << endl;
-				cout << "distance(all_db.begin(), result2)" << distance(all_db.begin(), result2) << endl;
-				cout << "tempDest[distance(all_db.begin(), result2)]" << tempDest[distance(all_db.begin(), result2)] << endl;
-				cout << "tempDest.size() = " << tempDest.size() << endl;
+				//cout << "result2" << *result2 << endl;
+				//cout << "distance(all_db.begin(), result2)" << distance(all_db.begin(), result2) << endl;
+				//cout << "tempDest[distance(all_db.begin(), result2)]" << tempDest[distance(all_db.begin(), result2)] << endl;
+				//cout << "tempDest.size() = " << tempDest.size() << endl;
 				if(*result1 > *result2){
-					cout << "kl51\n";
-					mv.push_back(tempOrig[distance(all_da.begin(), result1)]);
-					cout << "kl61\n";
-					cout << *find(tempOrig.begin(), tempOrig.end(), mv.back()) << endl;
-					tempOrig.erase(find(tempOrig.begin(), tempOrig.end(), mv.back()));
-					cout << "kl71\n";
-					g_max += *result1;
 					if(*result1 <= 0)break;
+					mv.push_back(tempOrig[distance(all_da.begin(), result1)]);
+					//cout << "mv = " << mv.back() << endl;;
+					//cout << communitiesOld[distance(community.begin(), find(community.begin(), community.end(), mv.back()))] << endl;
+					if(communitiesOld[distance(community.begin(), find(community.begin(), community.end(), mv.back()))] == 0){
+						mv.pop_back();
+						break;
+					}
+					tempOrig.erase(find(tempOrig.begin(), tempOrig.end(), mv.back()));
+					tempDest.push_back(mv.back());
+					g_max += *result1;
 				}
 				else{
-					cout << "kl52\n";
-					mv.push_back(tempDest[distance(all_db.begin(), result2)]);
-					cout << "kl62\n";
-					cout << *find(tempDest.begin(), tempDest.end(), mv.back()) << endl;
-					tempDest.erase(find(tempDest.begin(), tempDest.end(), mv.back()));
-					cout << "kl72\n";
-					g_max += *result2;
 					if(*result2 <= 0)break;
+					mv.push_back(tempDest[distance(all_db.begin(), result2)]);
+					//cout << "mv = " << mv.back() << endl;
+					//cout << communitiesOld[distance(community.begin(), find(community.begin(), community.end(), mv.back()))] << endl;				
+					if(communitiesOld[distance(community.begin(), find(community.begin(), community.end(), mv.back()))]){
+						mv.pop_back();
+						break;
+					}
+					tempDest.erase(find(tempDest.begin(), tempDest.end(), mv.back()));
+					tempOrig.push_back(mv.back());
+					g_max += *result2;
 				}
 			}
-			cout << "kl4\n";
 
 			// exchange
-			cout << "mv.size() = " << mv.size() << endl;
-			for(size_t i = 0; i < mv.size(); ++i){cout << mv[i] << endl;}
+			//cout << "mv.size() = " << mv.size() << endl;
+			//cout << "g_max = " << g_max << endl;
 			for(size_t i = 0; i < mv.size(); ++i){
-				cout << i << endl;
 				vector<int>::iterator it = find(oldOrig.begin(), oldOrig.end(), mv[i]);
 				if(it != oldOrig.end()){
 					oldOrig.erase(it);
 				}
 				else {
-					oldOrig.push_back(*it);
+					oldOrig.push_back(mv[i]);
 				}
 				it = find(oldDest.begin(), oldDest.end(), mv[i]);
 				if(it != oldDest.end()){
 					oldDest.erase(it);
 				}
 				else {
-					oldDest.push_back(*it);
+					oldDest.push_back(mv[i]);
 				}
 			}
+			double inden_gain1 = G.CalcInDen(oldOrig) * oldOrig.size() + G.CalcInDen(oldDest) * oldDest.size();
 		}
+		// store to communityNew
+		cout << "\n-----oldOrig-----\n";
+		for(size_t i = 0; i < oldOrig.size(); ++i){
+			cout << oldOrig[i] << " ";
+			if(find(community.begin(), community.end(), oldOrig[i]) == community.end())cerr << "error!\n\n";
+			communitiesNew[distance(community.begin(), find(community.begin(), community.end(), oldOrig[i]))] = 1;
+		}
+		cout << "\n-----oldDest-----\n";
+		for(size_t i = 0; i < oldDest.size(); ++i){
+			cout << oldDest[i] << " ";
+			if(find(community.begin(), community.end(), oldDest[i]) == community.end())cerr << "error!\n\n";
+			communitiesNew[distance(community.begin(), find(community.begin(), community.end(), oldDest[i]))] = 0;
+		}
+		for(size_t i = 0; i < communitiesNew.size(); ++i)cout << communitiesNew[i] << " ";
+		cout << endl;
+		cout << "inden1 = " << G.CalcInDen(oldOrig) << endl;
+		cout << "inden2 = " << G.CalcInDen(oldDest) << endl;
 		double inden_gain1 = G.CalcInDen(oldOrig) * oldOrig.size() + G.CalcInDen(oldDest) * oldDest.size();
-		cout << "result = " << inden_gain1 - inden_gain0 << endl;
-		return inden_gain1 - inden_gain0;
+		cout << "result111 = " << inden_gain1 - inden_gain0 << endl;
+		cout << "inden = " << inden_gain1 << endl;
+		return inden_gain1;
 	}
 	else{
 		int n = Q.size();
@@ -316,20 +321,18 @@ double Split(Graph& G, vector< vector<double> >& Q, const vector<double>& correc
 {
 	double mod_gain = 0.0;
 	vector<double> sumQ = Sum(Q);
-	if(Q.size() != splitCommunity.size())cout << "wrong! Q.size() != splitCommunity.size()\n";
+	//if(Q.size() != splitCommunity.size())cout << "wrong! Q.size() != splitCommunity.size()\n";
 	int n = splitCommunity.size();
 	if(Q.size() != 0){
 		for(int i = 0; i < n; ++i)
 			Q[i][i] += 2 * correctionVector[i] - sumQ[i]; //adjust the submatrix
 	}
-	cout << "check0\n";
 	int tries;
 	if(use_fixed_tries)
 		tries = 2;
 	else
 		tries = pow(abs(log(best_gain)), autoC2) / autoC1 + 3;
 	int tryI = 0;
-	cout << "check0.5\n";
 	while(tryI < tries)
 	{
 		tryI = tryI + 1;
@@ -341,26 +344,42 @@ double Split(Graph& G, vector< vector<double> >& Q, const vector<double>& correc
 		else
 			for(int i = 0; i < n; ++i)
 				communities0[i] = rand() < RAND_MAX2;
-		cout << "ckech0.7\n";
 		double mod_gain0 = ModGain(G, Q, correctionVector, communities0, communityInd);
-		cout << "check!\n";
-		double mod_gain1 = 1;
-		while(mod_gain1 > THRESHOLD)
-		{cout << "while\n";
-			vector<int> communitiesNew(n);
-			mod_gain1 = PerformKernighansShift(Q, correctionVector, communities0, communitiesNew, communityInd);
-			cout << "kl\n";
-			if(mod_gain1 > THRESHOLD)
+		double mod_gain1 = 1000;
+		if(Inden){
+			while(mod_gain1 - mod_gain0 > THRESHOLD)
 			{
-				mod_gain0 = mod_gain0 + mod_gain1;
-				communities0 = communitiesNew;
-				if(debug_verify)
+				vector<int> communitiesNew(n);
+				mod_gain1 = PerformKernighansShift(Q, correctionVector, communities0, communitiesNew, communityInd);
+				if(mod_gain1 - mod_gain0 > THRESHOLD)
 				{
-					double mod_gain_verify = ModGain(G, Q, correctionVector, communities0, communityInd);
-					if(fabs(mod_gain_verify - mod_gain0) > THRESHOLD)
-						cerr << "ERROR\n";
+					mod_gain0 = mod_gain1;
+					communities0 = communitiesNew;
+					if(debug_verify)
+					{
+						double mod_gain_verify = ModGain(G, Q, correctionVector, communities0, communityInd);
+						if(fabs(mod_gain_verify - mod_gain0) > THRESHOLD)
+							cerr << "ERROR\n";
+					}
 				}
-
+			}
+		}
+		else{
+			while(mod_gain1 > THRESHOLD)
+			{
+				vector<int> communitiesNew(n);
+				mod_gain1 = PerformKernighansShift(Q, correctionVector, communities0, communitiesNew, communityInd);
+				if(mod_gain1 > THRESHOLD)
+				{
+					mod_gain0 = mod_gain0 + mod_gain1;
+					communities0 = communitiesNew;
+					if(debug_verify)
+					{
+						double mod_gain_verify = ModGain(G, Q, correctionVector, communities0, communityInd);
+						if(fabs(mod_gain_verify - mod_gain0) > THRESHOLD)
+							cerr << "ERROR\n";
+					}
+				}
 			}
 		}
 		if(mod_gain < mod_gain0)
@@ -374,7 +393,7 @@ double Split(Graph& G, vector< vector<double> >& Q, const vector<double>& correc
 
 	if(fabs(mod_gain) < THRESHOLD)
 		splitCommunity.assign(n, 1);
-	
+	cout << "finished!\n";
 	return mod_gain;
 }
 
@@ -391,6 +410,7 @@ void reCalc(Graph& G, vector< vector<double> >& moves, vector< vector<int> >& sp
 				vector<int> splitComunity(origCommInd.size(), 0);
 				vector< vector<double> > Q;
 				moves[origin][dest] = Split(G, Q, correctionVector, splitComunity, origCommInd);
+				cout << "splitted\n";
 				for(int i = 0; i < splitComunity.size(); ++i)
 					splits_communities[dest][origCommInd[i]] = splitComunity[i];
 			} else{
@@ -463,9 +483,9 @@ void RunCombo(Graph& G, int max_comunities)
 	for(origin = 0; origin < G.CommunityNumber(); ++ origin)
 		for(dest = 0; dest < G.CommunityNumber() + (G.CommunityNumber() < max_comunities); ++dest)
 			reCalc(G, moves, splits_communities, origin, dest);
-
+	cout << "Modularity = " << G.Modularity() << endl;
 	best_gain = BestGain(moves, origin, dest);
-
+	double best_gain1 = 0;
 	while(best_gain > THRESHOLD)
 	{
 		bool comunityAdded = dest >= G.CommunityNumber();
@@ -494,16 +514,21 @@ void RunCombo(Graph& G, int max_comunities)
 		}
 
 		for(int i = 0; i < G.CommunityNumber() + (G.CommunityNumber() < max_comunities); ++i)
-		{
+		{cout << "i = " << i << endl;
 			reCalc(G, moves, splits_communities, origin, i);
+			cout << "Modularity = " << G.Modularity() << endl;
 			reCalc(G, moves, splits_communities, dest, i);
+			cout << "Modularity = " << G.Modularity() << endl;
 			if(i != dest && i < G.CommunityNumber())
 				reCalc(G, moves, splits_communities, i, origin);
 			if(i != origin && i < G.CommunityNumber())
 				reCalc(G, moves, splits_communities, i, dest);
+			cout << "Modularity = " << G.Modularity() << endl;
 		}
-		DeleteEmptyCommunities(G, moves, splits_communities, origin); //remove origin community if empty
+		//DeleteEmptyCommunities(G, moves, splits_communities, origin); //remove origin community if empty
+		if(Inden)best_gain1 = best_gain;
 		best_gain = BestGain(moves, origin, dest);
+		if(Inden)best_gain -= best_gain1;
 	}
 }
 

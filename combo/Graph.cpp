@@ -51,7 +51,7 @@ Graph::~Graph(void)
 }
 
 void Graph::FillMatrix(const vector<int>& src, const vector<int>& dst, const vector<double>& weight)
-{cout << "fill!!!!!!!!!!\n";
+{
 	int m = min(*min_element(src.begin(), src.end()), *min_element(dst.begin(), dst.end()));
 	if(m > 0)
 		m = 1;
@@ -124,6 +124,7 @@ void Graph::ReadFromEdgelist(const std::string& fname)
 	}
 	file.close();
 	FillMatrix(src, dst, weight);
+	FillModMatrix(src, dst, weight);
 }
 
 void Graph::ReadFromPajeck(const std::string& fname)
@@ -165,6 +166,7 @@ void Graph::ReadFromPajeck(const std::string& fname)
 	}
 	file.close();
 	FillMatrix(src, dst, weight);
+	FillModMatrix(src, dst, weight);
 }
 
 double Graph::EdgeWeight(int i, int j) const
@@ -285,13 +287,12 @@ double Graph::CalcTPRMtrix(const vector<int>& communityInd)
 			}
 		}
 	}
-	
 	return numTriad / communityInd.size();
 }
 
 double Graph::CalcInDen(const vector<int>& communityInd)
 {	
-	int Ms = 0;
+	double Ms = 0;
 	//calculate the number of triad node communityInd[i] participating in
 	for(int i = 0; i < communityInd.size(); ++i){
 		for(int j = 0; j < communityInd.size(); ++j){
@@ -303,7 +304,8 @@ double Graph::CalcInDen(const vector<int>& communityInd)
 			}
 		}
 	}
-	
+	if(communityInd.size() == 0)return 0;
+	if(communityInd.size() - 1 == 0)return 0;
 	return Ms / (communityInd.size() * (communityInd.size() - 1));
 }
 
