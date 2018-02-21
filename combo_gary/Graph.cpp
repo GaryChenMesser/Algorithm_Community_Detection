@@ -123,6 +123,7 @@ void Graph::ReadFromEdgelist(const std::string& fname)
 		}
 	}
 	file.close();
+	FillMatrix(src, dst, weight);
 	FillModMatrix(src, dst, weight);
 }
 
@@ -164,11 +165,13 @@ void Graph::ReadFromPajeck(const std::string& fname)
 		}
 	}
 	file.close();
+	FillMatrix(src, dst, weight);
 	FillModMatrix(src, dst, weight);
 }
 
 double Graph::EdgeWeight(int i, int j) const
 {
+	if(i >= m_matrix.size() || j >= m_matrix[0].size())cout << "error! in EdgeWeight(i, j)!";
 	return m_matrix[i][j];
 }
 
@@ -196,6 +199,161 @@ void Graph::CalcModMtrix()
 	for(int i = 0; i < m_size; ++i)
 		for(int j = 0; j < m_size; ++j)
 			m_modMatrix[i][j] = m_modMatrix[j][i] = (m_modMatrix[i][j] + m_modMatrix[j][i]) / 2;
+}
+
+//gary
+int Graph::numCommunity(const vector<int>& community) const
+{
+	vector<int> num;
+	for(int i = 0; i < community.size(); ++i){
+		for(int j = 0; j < num.size() + num.size()==0; ++j){
+			if(num.size()==0)num.push_back(community[i]);
+			if(num[j] != community[i] && num.size() - 1 == j)num.push_back(community[i]);
+			else{
+				if(num[j] == community[i])break;
+			}
+		}
+	}
+	return num.size();
+}
+
+//gary
+/*
+vector<double> Graph::CalcConMtrix(const vector<int>& communityInd)
+{
+	
+	cout << "m_size = " << m_size << " communityInd.size() = " << communityInd.size() << endl; 
+	vector<double> m_conList;
+
+	m_conList.assign(m_size, 0.0);
+	vector<double> sumCs(communityNum, 0.0);
+	vector<double> sumMs(communityNum, 0.0);
+	double i_cs = 0.0;
+	double i_ms = 0.0;
+	
+	for(int i = 0; i < communityInd.size(); ++i){
+		i_cs = 0.0;
+		i_ms = 0.0;
+		
+		for(int j = 0; j < communityInd.size(); ++j){
+			if(communityInd[i] != communityInd[j]){
+				i_cs += m_matrix[i][j];
+			}else{
+				i_ms += m_matrix[i][j];
+			}
+		}
+		
+		m_conList[i] = i_cs;
+		sumCs[communityInd[i]] += i_cs;
+		sumMs[communityInd[i]] += i_ms;
+	}
+	
+	for(int i = 0; i < communityInd.size(); ++i){
+		m_conList[i] /= (2 * sumMs[communityInd[i]] + sumCs[communityInd[i]]);
+	}
+	cout << "haha\n";
+	return m_conList;
+}*/
+
+//TPR
+//for undirected graph : trivial
+//for directed graph : make every edge undirected
+double Graph::CalcTPRMtrix(const vector<int>& communityInd)
+{	
+	int numTriad = 0;
+	//calculate the number of triad node communityInd[i] participating in
+	for(int i = 0; i < communityInd.size(); ++i){
+		vector<int> neighbor;
+		//find neighbor of communityInd[i]
+		for(int j = 0; j < communityInd.size(); ++j){
+			if(i != j){
+				if(m_matrix[communityInd[i]][communityInd[j]]){
+					neighbor.push_back(communityInd[j]);
+				}
+				else if(m_matrix[communityInd[j]][communityInd[i]]){
+					neighbor.push_back(communityInd[j]);	
+				}
+			}
+		}
+		//find the number of pair of connected neighbors
+		for(int j = 0; j < neighbor.size(); ++j){
+			for(int k = j + 1; k < neighbor.size(); ++k){
+				if(m_matrix[neighbor[j]][neighbor[k]]){
+					++numTriad;
+				}
+				else if(m_matrix[neighbor[k]][neighbor[j]]){
+					++numTriad;	
+				}
+			}
+		}
+	}
+	return numTriad / communityInd.size();
+}
+
+double Graph::CalcInDen(const vector<int>& communityInd)
+{	
+	double Ms = 0;
+	//calculate the number of triad node communityInd[i] participating in
+	for(int i = 0; i < communityInd.size(); ++i){
+		for(int j = 0; j < communityInd.size(); ++j){
+			if(m_matrix[communityInd[i]][communityInd[j]]){
+				++Ms;
+			}
+			if(m_matrix[communityInd[j]][communityInd[i]]){
+				++Ms;
+			}
+		}
+	}
+	if(communityInd.size() == 0)return 0;
+	if(communityInd.size() - 1 == 0)return 0;
+	return Ms / (communityInd.size() * (communityInd.size() - 1));
+}
+
+double Graph::CalcInDen(const set<int>& communityInd)
+{	
+	double Ms = 0;
+	//calculate the number of triad node communityInd[i] participating in
+	for(set<int>::iterator i = communityInd.begin(); i != communityInd.end(); ++i){
+		for(set<int>::iterator j = communityInd.begin(); j != communityInd.end(); ++j){
+			if(m_matrix[*i][*j]){
+				++Ms;
+			}
+			if(m_matrix[*j][*i]){
+				++Ms;
+			}
+		}
+	}
+	if(communityInd.size() == 0)return 0;
+	if(communityInd.size() - 1 == 0)return 0;
+	return Ms / (communityInd.size() * (communityInd.size() - 1));
+}
+
+double Graph::InDen()
+{	
+	double inden = 0;
+	//calculate the number of triad node communityInd[i] participating in
+	for(size_t i = 0; i < m_communityNumber; ++i){
+		double Ms = 0;
+		int n = 0;
+		for(size_t j = 0; j < m_size; ++j){
+			for(size_t k = 0; k < m_size; ++k){
+				if(m_communities[j] == i){
+					++n;
+					if(m_communities[k] == i){
+						if(m_matrix[j][k]){
+							++Ms;
+						}
+						if(m_matrix[k][j]){
+							++Ms;
+						}
+					}
+				}
+			}
+		}
+		if(n != 1)inden += Ms / (n * (n - 1)) * n / m_size;
+	}
+
+	return inden;
 }
 
 void Graph::Print() const
@@ -250,6 +408,7 @@ double Graph::Modularity() const
 				mod += m_modMatrix[i][j];
 	return mod;
 }
+
 
 void Graph::PerformSplit(int origin, int dest, const vector<int>& split_communities)
 {
@@ -306,6 +465,7 @@ vector< vector<double> > Graph::GetModularitySubmatrix(const vector<int>& indice
 			res[i][j] = m_modMatrix[indices[i]][indices[j]];
 	return res;
 }
+
 
 vector<double> Graph::GetCorrectionVector(const vector<int>& origCommInd, const vector<int>& destCommInd) const
 {

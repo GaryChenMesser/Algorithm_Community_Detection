@@ -33,16 +33,12 @@ const bool debug_verify = false;
 
 
 #define INF 1000000000
-//#define THRESHOLD 1e-6
-#define THRESHOLD 0.1
+#define THRESHOLD 1e-6
 const int RAND_MAX2 = RAND_MAX >> 1;
 
 const double autoC1 = 2;
 const double autoC2 = 1.5;
 bool use_fixed_tries = false;
-//gary
-bool Inden = false;
-Graph G;
 
 double best_gain = 1.0;
 
@@ -81,252 +77,90 @@ bool TestAll(const vector<T>& vec, bool (*Pred)(T))
 	return true;
 }
 
-double ModGain(Graph& G, const vector< vector<double> >& Q, const vector<double>& correctionVector, const vector<int>& community, vector<int>& communityInd)
+double ModGain(const vector< vector<double> >& Q, const vector<double>& correctionVector, const vector<int>& community)
 {
-	if(Inden){
-		int n = community.size();
-
-		vector<int> NewOrig;
-		vector<int> NewDest;
-		for(size_t i = 0; i < communityInd.size(); ++i){
-			if(community[i])NewOrig.push_back(communityInd[i]);
-			else NewDest.push_back(communityInd[i]);
-		}
-		double IndenOldOrig = G.CalcInDen(communityInd);
-
-		double IndenNewOrig = G.CalcInDen(NewOrig);
-		double IndenNewDest = G.CalcInDen(NewDest);
-		
-		return IndenNewOrig * NewOrig.size() + IndenNewDest * NewDest.size();
-	}
-	
-	else{
-		int n = community.size();
-		double mod_gain = 0.0;
-		for(int i = 0; i < n; ++i)
-		{
-			for(int j = 0; j < n; ++j)
-				if(community[i] == community[j])
-					mod_gain += Q[i][j];
-				else
-					mod_gain -= Q[i][j];
-		}
-		mod_gain *= 0.5;
-		for(int i = 0; i < n; ++i)
-		{
-			if(community[i])
-				mod_gain += correctionVector[i];
+	int n = community.size();
+	double mod_gain = 0.0;
+	for(int i = 0; i < n; ++i)
+	{
+		for(int j = 0; j < n; ++j)
+			if(community[i] == community[j])
+				mod_gain += Q[i][j];
 			else
-				mod_gain -= correctionVector[i];
-		}
-		return mod_gain;
+				mod_gain -= Q[i][j];
 	}
-}
-
-double PerformKernighansShift(const vector< vector<double> >& Q, const vector<double>& correctionVector, const vector<int>& communitiesOld, vector<int>& communitiesNew, const vector<int>& community) //perform a split improvement using a Karnigan-Lin-style iterative shifts series
-{
-	if(Inden){
-		double g_max = 0;
-		double g_max1 = 1;
-		vector<int> oldOrig;
-		vector<int> oldDest;
-
-		for(size_t i = 0; i < community.size(); ++i){
-			if(communitiesOld[i])oldOrig.push_back(community[i]);
-			else oldDest.push_back(community[i]);
-		}
-		double inden_gain0 = G.CalcInDen(oldOrig) * oldOrig.size() + G.CalcInDen(oldDest) * oldDest.size();
-		//cout << "oldOrig.size() = " << oldOrig.size() << endl;
-		//cout << "oldDest.size() = " << oldDest.size() << endl;
-		//cout << "G.CalcInDen(oldOrig) = " << G.CalcInDen(oldOrig) << endl;
-		//cout << "G.CalcInDen(oldDest) = " << G.CalcInDen(oldDest) << endl;
-		//cout << "inden_gain0 = " << inden_gain0 << endl;
-		while(g_max1 - g_max > 0){
-			g_max1 = g_max;
-			g_max = 0;
-			vector<double> gv;
-			vector<int> mv;
-			//vector<int> bv;			
-			vector<int> tempOrig = oldOrig;
-			vector<int> tempDest = oldDest;
-			double minima1 = 100;
-			double minima2 = 100;
-			while(tempOrig.size() > 2 && tempDest.size() > 2){
-				vector<double> all_da;
-				vector<double> all_db;
-				for(size_t i = 0; i < tempOrig.size(); ++i){
-					double degree = 0;
-					for(size_t j = 0; j < tempOrig.size(); ++j)
-						degree -= G.EdgeWeight(tempOrig[i], tempOrig[j]);
-					degree /= ((tempOrig.size() - 2) * (tempOrig.size() - 1));
-					
-					for(size_t j = 0; j < tempDest.size(); ++j)
-						degree += G.EdgeWeight(tempOrig[i], tempDest[j]);
-					degree /= (tempDest.size() * (tempDest.size() + 1));
-					
-					all_da.push_back(degree);
-				}
-				for(size_t i = 0; i < tempDest.size(); ++i){
-					double degree = 0;
-					for(size_t j = 0; j < tempDest.size(); ++j)
-						degree -= G.EdgeWeight(tempDest[i], tempDest[j]);
-					degree /= ((tempDest.size() - 2) * (tempDest.size() - 1));
-					
-					for(size_t j = 0; j < oldOrig.size(); ++j)
-						degree += G.EdgeWeight(tempDest[i], tempOrig[j]);
-					degree /= (tempOrig.size() * (tempOrig.size() + 1));
-					
-					all_db.push_back(degree);
-				}
-				vector<double>::iterator result1;
-				vector<double>::iterator result2;
-
-				result1 = max_element(all_da.begin(), all_da.end());
-				//cout << "result1 = " << *result1 << endl;
-				//cout << "distance(all_da.begin(), result1)" << distance(all_da.begin(), result1) << endl;
-				//cout << "tempOrig[distance(all_da.begin(), result1)]" << tempOrig[distance(all_da.begin(), result1)] << endl;
-				//cout << "tempOrig.size() = " << tempOrig.size() << endl;
-				result2 = max_element(all_db.begin(), all_db.end());
-				//cout << "result2" << *result2 << endl;
-				//cout << "distance(all_db.begin(), result2)" << distance(all_db.begin(), result2) << endl;
-				//cout << "tempDest[distance(all_db.begin(), result2)]" << tempDest[distance(all_db.begin(), result2)] << endl;
-				//cout << "tempDest.size() = " << tempDest.size() << endl;
-				if(*result1 > *result2){
-					if(*result1 <= 0)break;
-					mv.push_back(tempOrig[distance(all_da.begin(), result1)]);
-					//cout << "mv = " << mv.back() << endl;;
-					//cout << communitiesOld[distance(community.begin(), find(community.begin(), community.end(), mv.back()))] << endl;
-					if(communitiesOld[distance(community.begin(), find(community.begin(), community.end(), mv.back()))] == 0){
-						mv.pop_back();
-						break;
-					}
-					tempOrig.erase(find(tempOrig.begin(), tempOrig.end(), mv.back()));
-					tempDest.push_back(mv.back());
-					g_max += *result1;
-				}
-				else{
-					if(*result2 <= 0)break;
-					mv.push_back(tempDest[distance(all_db.begin(), result2)]);
-					//cout << "mv = " << mv.back() << endl;
-					//cout << communitiesOld[distance(community.begin(), find(community.begin(), community.end(), mv.back()))] << endl;				
-					if(communitiesOld[distance(community.begin(), find(community.begin(), community.end(), mv.back()))]){
-						mv.pop_back();
-						break;
-					}
-					tempDest.erase(find(tempDest.begin(), tempDest.end(), mv.back()));
-					tempOrig.push_back(mv.back());
-					g_max += *result2;
-				}
-			}
-
-			// exchange
-			//cout << "mv.size() = " << mv.size() << endl;
-			//cout << "g_max = " << g_max << endl;
-			for(size_t i = 0; i < mv.size(); ++i){
-				vector<int>::iterator it = find(oldOrig.begin(), oldOrig.end(), mv[i]);
-				if(it != oldOrig.end()){
-					oldOrig.erase(it);
-				}
-				else {
-					oldOrig.push_back(mv[i]);
-				}
-				it = find(oldDest.begin(), oldDest.end(), mv[i]);
-				if(it != oldDest.end()){
-					oldDest.erase(it);
-				}
-				else {
-					oldDest.push_back(mv[i]);
-				}
-			}
-			double inden_gain1 = G.CalcInDen(oldOrig) * oldOrig.size() + G.CalcInDen(oldDest) * oldDest.size();
-		}
-		// store to communityNew
-		cout << "\n-----oldOrig-----\n";
-		for(size_t i = 0; i < oldOrig.size(); ++i){
-			cout << oldOrig[i] << " ";
-			if(find(community.begin(), community.end(), oldOrig[i]) == community.end())cerr << "error!\n\n";
-			communitiesNew[distance(community.begin(), find(community.begin(), community.end(), oldOrig[i]))] = 1;
-		}
-		cout << "\n-----oldDest-----\n";
-		for(size_t i = 0; i < oldDest.size(); ++i){
-			cout << oldDest[i] << " ";
-			if(find(community.begin(), community.end(), oldDest[i]) == community.end())cerr << "error!\n\n";
-			communitiesNew[distance(community.begin(), find(community.begin(), community.end(), oldDest[i]))] = 0;
-		}
-		for(size_t i = 0; i < communitiesNew.size(); ++i)cout << communitiesNew[i] << " ";
-		cout << endl;
-		cout << "inden1 = " << G.CalcInDen(oldOrig) << endl;
-		cout << "inden2 = " << G.CalcInDen(oldDest) << endl;
-		double inden_gain1 = G.CalcInDen(oldOrig) * oldOrig.size() + G.CalcInDen(oldDest) * oldDest.size();
-		cout << "result111 = " << inden_gain1 - inden_gain0 << endl;
-		cout << "inden = " << inden_gain1 << endl;
-		return inden_gain1;
-	}
-	else{
-		int n = Q.size();
-		vector<double> gains(n, 0.0);
-		for(int i = 0; i < n; ++i)
-		{
-			for(int j = 0; j < n; ++j)
-				if(i != j)
-					if(communitiesOld[i] == communitiesOld[j])
-						gains[i] -= Q[i][j];
-					else
-						gains[i] += Q[i][j];
-			if(communitiesOld[i])
-				gains[i] -= correctionVector[i];
-			else
-				gains[i] += correctionVector[i];
-			gains[i] *= 2;
-		}
-		vector<double> gains_got(n, 0.0);
-		vector<int> gains_indexes(n, 0);
-		communitiesNew = communitiesOld;
-		for(int i = 0; i < n; ++i)
-		{
-			vector<double>::iterator it = max_element(gains.begin(), gains.end());
-			gains_got[i] = *it;
-			int gains_ind = it - gains.begin();
-			gains_indexes[i] = gains_ind;
-			if(i > 0)
-				gains_got[i] = gains_got[i] + gains_got[i-1];
-			for(int j = 0; j < n; ++j)
-				if(communitiesNew[gains_ind] == communitiesNew[j])
-					gains[j] += 4 * Q[gains_ind][j];
-				else
-					gains[j] -= 4 * Q[gains_ind][j];
-			communitiesNew[gains_ind] = !communitiesNew[gains_ind];
-			gains[gains_ind] = gains[gains_ind] - 2*n;
-		}
-		vector<double>::iterator it = max_element(gains_got.begin(), gains_got.end());
-		double mod_gain = *it;
-		int stepsToGetMaxGain = it - gains_got.begin() + 1;
-		if(mod_gain > 0)
-		{
-			communitiesNew = communitiesOld;
-			for(int i = 0; i < stepsToGetMaxGain; ++i)
-				communitiesNew[gains_indexes[i]] = !communitiesNew[gains_indexes[i]];
-		}
+	mod_gain *= 0.5;
+	for(int i = 0; i < n; ++i)
+	{
+		if(community[i])
+			mod_gain += correctionVector[i];
 		else
-		{
-			communitiesNew = communitiesOld;
-			mod_gain = 0;
-		}
-		return mod_gain;
+			mod_gain -= correctionVector[i];
 	}
- 	
+	return mod_gain;
 }
 
-double Split(Graph& G, vector< vector<double> >& Q, const vector<double>& correctionVector, vector<int>& splitCommunity, vector<int>& communityInd) //try to split the subnetwork with respect to the correction vector
+double PerformKernighansShift(const vector< vector<double> >& Q, const vector<double>& correctionVector, const vector<int>& communitiesOld, vector<int>& communitiesNew) //perform a split improvement using a Karnigan-Lin-style iterative shifts series
+{
+ 	int n = Q.size();
+	vector<double> gains(n, 0.0);
+	for(int i = 0; i < n; ++i)
+	{
+		for(int j = 0; j < n; ++j)
+			if(i != j)
+				if(communitiesOld[i] == communitiesOld[j])
+					gains[i] -= Q[i][j];
+				else
+					gains[i] += Q[i][j];
+		if(communitiesOld[i])
+			gains[i] -= correctionVector[i];
+		else
+			gains[i] += correctionVector[i];
+		gains[i] *= 2;
+	}
+	vector<double> gains_got(n, 0.0);
+	vector<int> gains_indexes(n, 0);
+	communitiesNew = communitiesOld;
+	for(int i = 0; i < n; ++i)
+	{
+		vector<double>::iterator it = max_element(gains.begin(), gains.end());
+		gains_got[i] = *it;
+		int gains_ind = it - gains.begin();
+		gains_indexes[i] = gains_ind;
+		if(i > 0)
+			gains_got[i] = gains_got[i] + gains_got[i-1];
+		for(int j = 0; j < n; ++j)
+			if(communitiesNew[gains_ind] == communitiesNew[j])
+				gains[j] += 4 * Q[gains_ind][j];
+			else
+				gains[j] -= 4 * Q[gains_ind][j];
+		communitiesNew[gains_ind] = !communitiesNew[gains_ind];
+		gains[gains_ind] = gains[gains_ind] - 2*n;
+	}
+	vector<double>::iterator it = max_element(gains_got.begin(), gains_got.end());
+	double mod_gain = *it;
+	int stepsToGetMaxGain = it - gains_got.begin() + 1;
+	if(mod_gain > 0)
+	{
+		communitiesNew = communitiesOld;
+		for(int i = 0; i < stepsToGetMaxGain; ++i)
+			communitiesNew[gains_indexes[i]] = !communitiesNew[gains_indexes[i]];
+	}
+	else
+	{
+		communitiesNew = communitiesOld;
+		mod_gain = 0;
+	}
+	return mod_gain;
+}
+
+double Split(vector< vector<double> >& Q, const vector<double>& correctionVector, vector<int>& splitCommunity) //try to split the subnetwork with respect to the correction vector
 {
 	double mod_gain = 0.0;
 	vector<double> sumQ = Sum(Q);
-	//if(Q.size() != splitCommunity.size())cout << "wrong! Q.size() != splitCommunity.size()\n";
-	int n = splitCommunity.size();
-	if(Q.size() != 0){
-		for(int i = 0; i < n; ++i)
-			Q[i][i] += 2 * correctionVector[i] - sumQ[i]; //adjust the submatrix
-	}
+	int n = Q.size();
+	for(int i = 0; i < n; ++i)
+		Q[i][i] += 2 * correctionVector[i] - sumQ[i]; //adjust the submatrix
 	int tries;
 	if(use_fixed_tries)
 		tries = 2;
@@ -344,42 +178,24 @@ double Split(Graph& G, vector< vector<double> >& Q, const vector<double>& correc
 		else
 			for(int i = 0; i < n; ++i)
 				communities0[i] = rand() < RAND_MAX2;
-		double mod_gain0 = ModGain(G, Q, correctionVector, communities0, communityInd);
-		double mod_gain1 = 1000;
-		if(Inden){
-			while(mod_gain1 - mod_gain0 > THRESHOLD)
+
+		double mod_gain0 = ModGain(Q, correctionVector, communities0);
+		double mod_gain1 = 1;
+		while(mod_gain1 > THRESHOLD)
+		{
+			vector<int> communitiesNew(n);
+			mod_gain1 = PerformKernighansShift(Q, correctionVector, communities0, communitiesNew);
+			if(mod_gain1 > THRESHOLD)
 			{
-				vector<int> communitiesNew(n);
-				mod_gain1 = PerformKernighansShift(Q, correctionVector, communities0, communitiesNew, communityInd);
-				if(mod_gain1 - mod_gain0 > THRESHOLD)
+				mod_gain0 = mod_gain0 + mod_gain1;
+				communities0 = communitiesNew;
+				if(debug_verify)
 				{
-					mod_gain0 = mod_gain1;
-					communities0 = communitiesNew;
-					if(debug_verify)
-					{
-						double mod_gain_verify = ModGain(G, Q, correctionVector, communities0, communityInd);
-						if(fabs(mod_gain_verify - mod_gain0) > THRESHOLD)
-							cerr << "ERROR\n";
-					}
+					double mod_gain_verify = ModGain(Q, correctionVector, communities0);
+					if(fabs(mod_gain_verify - mod_gain0) > THRESHOLD)
+						printf("ERROR\n");
 				}
-			}
-		}
-		else{
-			while(mod_gain1 > THRESHOLD)
-			{
-				vector<int> communitiesNew(n);
-				mod_gain1 = PerformKernighansShift(Q, correctionVector, communities0, communitiesNew, communityInd);
-				if(mod_gain1 > THRESHOLD)
-				{
-					mod_gain0 = mod_gain0 + mod_gain1;
-					communities0 = communitiesNew;
-					if(debug_verify)
-					{
-						double mod_gain_verify = ModGain(G, Q, correctionVector, communities0, communityInd);
-						if(fabs(mod_gain_verify - mod_gain0) > THRESHOLD)
-							cerr << "ERROR\n";
-					}
-				}
+
 			}
 		}
 		if(mod_gain < mod_gain0)
@@ -393,7 +209,7 @@ double Split(Graph& G, vector< vector<double> >& Q, const vector<double>& correc
 
 	if(fabs(mod_gain) < THRESHOLD)
 		splitCommunity.assign(n, 1);
-	cout << "finished!\n";
+	
 	return mod_gain;
 }
 
@@ -405,22 +221,12 @@ void reCalc(Graph& G, vector< vector<double> >& moves, vector< vector<int> >& sp
 		vector<int> origCommInd = G.CommunityIndices(origin);
 		if(!origCommInd.empty())
 		{
-			if(Inden){
-				vector<double> correctionVector;
-				vector<int> splitComunity(origCommInd.size(), 0);
-				vector< vector<double> > Q;
-				moves[origin][dest] = Split(G, Q, correctionVector, splitComunity, origCommInd);
-				cout << "splitted\n";
-				for(int i = 0; i < splitComunity.size(); ++i)
-					splits_communities[dest][origCommInd[i]] = splitComunity[i];
-			} else{
-				vector<double> correctionVector = G.GetCorrectionVector(origCommInd, G.CommunityIndices(dest));
-				vector<int> splitComunity(origCommInd.size());
-				vector< vector<double> > Q = G.GetModularitySubmatrix(origCommInd);
-				moves[origin][dest] = Split(G, Q, correctionVector, splitComunity, origCommInd);
-				for(int i = 0; i < splitComunity.size(); ++i)
-					splits_communities[dest][origCommInd[i]] = splitComunity[i];
-			}
+			vector<double> correctionVector = G.GetCorrectionVector(origCommInd, G.CommunityIndices(dest));
+			vector<int> splitComunity(origCommInd.size());
+			vector< vector<double> > Q = G.GetModularitySubmatrix(origCommInd);
+			moves[origin][dest] = Split(Q, correctionVector, splitComunity);
+			for(int i = 0; i < splitComunity.size(); ++i)
+				splits_communities[dest][origCommInd[i]] = splitComunity[i];
 		}
 	}
 }
@@ -459,22 +265,11 @@ void DeleteEmptyCommunities(Graph& G, vector< vector<double> >& moves, vector< v
 }
 
 void RunCombo(Graph& G, int max_comunities)
-{	
-	//gary
-	if(Inden){
-		//G.CalcConMtrix();
-	} else{
-		G.CalcModMtrix();
-	}
+{
+	G.CalcModMtrix();
 	G.SetCommunities(vector<int>(G.Size(), 0));
-	double currentCon;
-	double currentMod;
-	if(Inden){
-		//currentCon = G.myConductance();
-	} else{
-		currentMod = G.Modularity();
-	}
-	//cerr << "Initial modularity: " << currentMod << endl;
+	double currentMod = G.Modularity();
+	//printf("Initial modularity: %6f\n", currentMod);
 	vector< vector<double> > moves(2, vector<double>(2, 0)); //results of splitting communities 
 	//vectors of boolean meaning that corresponding vertex should be moved to dest
 	vector< vector<int> > splits_communities(2, vector<int>(G.Size(), 0)); //best split vectors
@@ -483,9 +278,9 @@ void RunCombo(Graph& G, int max_comunities)
 	for(origin = 0; origin < G.CommunityNumber(); ++ origin)
 		for(dest = 0; dest < G.CommunityNumber() + (G.CommunityNumber() < max_comunities); ++dest)
 			reCalc(G, moves, splits_communities, origin, dest);
-	cout << "Modularity = " << G.Modularity() << endl;
+
 	best_gain = BestGain(moves, origin, dest);
-	double best_gain1 = 0;
+
 	while(best_gain > THRESHOLD)
 	{
 		bool comunityAdded = dest >= G.CommunityNumber();
@@ -495,7 +290,7 @@ void RunCombo(Graph& G, int max_comunities)
 			double oldMod = currentMod;
 			currentMod = G.Modularity();
 			if(fabs(currentMod - oldMod - best_gain) > THRESHOLD)
-				cerr << "ERROR\n";
+				printf("ERROR\n");
 		}
 		if(comunityAdded && dest < max_comunities - 1)
 		{
@@ -514,21 +309,16 @@ void RunCombo(Graph& G, int max_comunities)
 		}
 
 		for(int i = 0; i < G.CommunityNumber() + (G.CommunityNumber() < max_comunities); ++i)
-		{cout << "i = " << i << endl;
+		{
 			reCalc(G, moves, splits_communities, origin, i);
-			cout << "Modularity = " << G.Modularity() << endl;
 			reCalc(G, moves, splits_communities, dest, i);
-			cout << "Modularity = " << G.Modularity() << endl;
 			if(i != dest && i < G.CommunityNumber())
 				reCalc(G, moves, splits_communities, i, origin);
 			if(i != origin && i < G.CommunityNumber())
 				reCalc(G, moves, splits_communities, i, dest);
-			cout << "Modularity = " << G.Modularity() << endl;
 		}
-		//DeleteEmptyCommunities(G, moves, splits_communities, origin); //remove origin community if empty
-		if(Inden)best_gain1 = best_gain;
+		DeleteEmptyCommunities(G, moves, splits_communities, origin); //remove origin community if empty
 		best_gain = BestGain(moves, origin, dest);
-		if(Inden)best_gain -= best_gain1;
 	}
 }
 
@@ -545,18 +335,14 @@ int main(int argc, char** argv)
 		if(string(argv[2]) != "INF")
 		max_comunities = atoi(argv[2]);
 	}
-	if(argc > 4)
-		use_fixed_tries = atoi(argv[4]);
-	if(argc > 3){
-		Inden = 1;
-		cout << "Scoring function: Internal density.\n";
-	}
-	else cout << "Scoring function: Modularity.\n";
+	if(argc > 3)
+		use_fixed_tries = atoi(argv[3]);
+
 
 	string fileName = argv[1];
 	srand(time(0));
 
-	
+	Graph G;
 	string ext = fileName.substr(fileName.rfind('.'), fileName.length() - fileName.rfind('.'));
 	if(ext == ".edgelist")
 		G.ReadFromEdgelist(fileName);
@@ -567,7 +353,7 @@ int main(int argc, char** argv)
 		cout << "Error: graph is empty" << endl;
 		return -1;
 	}
-	
+
 	clock_t startTime = clock();
 	RunCombo(G, max_comunities);
 
