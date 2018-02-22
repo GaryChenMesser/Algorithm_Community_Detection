@@ -83,19 +83,19 @@ double ModGain(const vector< vector<double> >& Q, const vector<double>& correcti
 	double mod_gain = 0.0;
 	for(int i = 0; i < n; ++i)
 	{
-		for(int j = 0; j < n; ++j)
-			if(community[i] == community[j])
-				mod_gain += Q[i][j];
-			else
+		for(int j = 0; j < n; ++j){
+			if(community[i] != community[j])
 				mod_gain -= Q[i][j];
+		}
 	}
-	mod_gain *= 0.5;
+	//mod_gain *= 0.5;
 	for(int i = 0; i < n; ++i)
 	{
 		if(community[i])
 			mod_gain += correctionVector[i];
-		else
-			mod_gain -= correctionVector[i];
+		//else
+		//	mod_gain -= correctionVector[i];
+		//mod_gain += correctionVector[i];
 	}
 	return mod_gain;
 }
@@ -177,7 +177,7 @@ double Split(vector< vector<double> >& Q, const vector<double>& correctionVector
 			communities0.assign(n, 2 - tryI);
 		else
 			for(int i = 0; i < n; ++i)
-				communities0[i] = rand() < RAND_MAX2;
+				communities0[i] = rand() < 0;
 
 		double mod_gain0 = ModGain(Q, correctionVector, communities0);
 		double mod_gain1 = 1;
@@ -193,7 +193,7 @@ double Split(vector< vector<double> >& Q, const vector<double>& correctionVector
 				{
 					double mod_gain_verify = ModGain(Q, correctionVector, communities0);
 					if(fabs(mod_gain_verify - mod_gain0) > THRESHOLD)
-						printf("ERROR\n");
+						cout << "ERROR\n";
 				}
 
 			}
@@ -269,7 +269,7 @@ void RunCombo(Graph& G, int max_comunities)
 	G.CalcModMtrix();
 	G.SetCommunities(vector<int>(G.Size(), 0));
 	double currentMod = G.Modularity();
-	//printf("Initial modularity: %6f\n", currentMod);
+	cout << "Initial modularity: " << currentMod << endl;
 	vector< vector<double> > moves(2, vector<double>(2, 0)); //results of splitting communities 
 	//vectors of boolean meaning that corresponding vertex should be moved to dest
 	vector< vector<int> > splits_communities(2, vector<int>(G.Size(), 0)); //best split vectors
@@ -290,7 +290,7 @@ void RunCombo(Graph& G, int max_comunities)
 			double oldMod = currentMod;
 			currentMod = G.Modularity();
 			if(fabs(currentMod - oldMod - best_gain) > THRESHOLD)
-				printf("ERROR\n");
+				cout << "ERROR\n";
 		}
 		if(comunityAdded && dest < max_comunities - 1)
 		{
