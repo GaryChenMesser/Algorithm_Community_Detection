@@ -83,12 +83,11 @@ double ModGain(const vector< vector<double> >& Q, const vector<double>& correcti
 	double mod_gain = 0.0;
 	for(int i = 0; i < n; ++i)
 	{
-		for(int j = 0; j < n; ++j){
-			if(community[i] != community[j])
-				mod_gain -= Q[i][j];
-			else
+		for(int j = 0; j < n; ++j)
+			if(community[i] == community[j])
 				mod_gain += Q[i][j];
-		}
+			else
+				mod_gain -= Q[i][j];
 	}
 	mod_gain *= 0.5;
 	for(int i = 0; i < n; ++i)
@@ -178,7 +177,7 @@ double Split(vector< vector<double> >& Q, const vector<double>& correctionVector
 			communities0.assign(n, 2 - tryI);
 		else
 			for(int i = 0; i < n; ++i)
-				communities0[i] = rand() < 0;
+				communities0[i] = rand() < RAND_MAX2;
 
 		double mod_gain0 = ModGain(Q, correctionVector, communities0);
 		double mod_gain1 = 1;
@@ -214,6 +213,24 @@ double Split(vector< vector<double> >& Q, const vector<double>& correctionVector
 	return mod_gain;
 }
 
+void reCalc(Graph& G, vector< vector<double> >& moves, vector< vector<int> >& splits_communities, int origin, int dest)
+{
+	moves[origin][dest] = 0;
+	if(origin != dest)
+	{
+		vector<int> origCommInd = G.CommunityIndices(origin);
+		if(!origCommInd.empty())
+		{
+			vector<double> correctionVector = G.GetCorrectionVector(origCommInd, G.CommunityIndices(dest));
+			vector<int> splitComunity(origCommInd.size());
+			vector< vector<double> > Q = G.GetModularitySubmatrix(origCommInd);
+			moves[origin][dest] = Split(Q, correctionVector, splitComunity);
+			for(int i = 0; i < splitComunity.size(); ++i)
+				splits_communities[dest][origCommInd[i]] = splitComunity[i];
+		}
+	}
+}
+
 double BestGain(const vector< vector<double> >& moves, int& origin, int& dest)
 {
 	double bestGain = -1;
@@ -228,71 +245,22 @@ double BestGain(const vector< vector<double> >& moves, int& origin, int& dest)
 	return bestGain;
 }
 
-double BestDestGain(const vector< vector<double> >& moves, int& origin, int dest)
-{
-	double bestGain = -1;
-	for(int i = 0; i < moves.size(); ++i)
-		if(bestGain < moves[i][dest])
-		{
-			bestGain = moves[i][dest];
-			origin = i;
-		}
-	return bestGain;
-}
-
-void reCalc(Graph& G, vector< vector<double> >& moves, vector< vector<int> >& splits_communities, int origin, int dest)
-{
-	moves[origin][dest] = 0;
-	if(origin != dest)
-	{
-		vector<int> origCommInd = G.CommunityIndices(origin);
-		if(!origCommInd.empty())
-		{
-			vector<double> correctionVector = G.GetCorrectionVector(origCommInd, G.CommunityIndices(dest));
-			vector<int> splitComunity(origCommInd.size());
-			vector< vector<double> > Q = G.GetModularitySubmatrix(origCommInd);
-			moves[origin][dest] = Split(Q, correctionVector, splitComunity);
-			
-			//int best_origin;
-			//double g = BestDestGain(moves, best_origin, dest);
-			//if(g == 0 || best_origin == origin)
-				for(int i = 0; i < splitComunity.size(); ++i)
-					splits_communities[dest][origCommInd[i]] = splitComunity[i];
-		}
-	}
-}
-
 void DeleteEmptyCommunities(Graph& G, vector< vector<double> >& moves, vector< vector<int> >& splits_communities, int origin)
 {
 	if(G.DeleteCommunityIfEmpty(origin))
 	{
-cerr << "delete!\n";
 		int commNumber = G.CommunityNumber();
-		
 		for(int i = origin; i < commNumber; ++i)
 			moves[i] = moves[i+1];
-//cerr << "delete1\n";
-		moves[commNumber].assign(moves[commNumber].size(), 0);
-//cerr << "delete2\n";
-//cerr << moves[0].size() << endl;
-//cerr << commNumber+1 << endl;
-//cerr << moves[0][commNumber+2] << endl;
+		moves[commNumber].assign(commNumber+1, 0);
 		for(int i = 0; i < moves.size(); ++i)
 		{
 			for(int j = origin; j < commNumber; ++j)
 				moves[i][j] = moves[i][j+1];
 			moves[i][commNumber] = 0;
 		}
-//cerr << "delete2.5\n";
-//cerr << commNumber+1 << endl;
-//cerr << moves[0].size() << endl;
-
-//cerr << splits_communities.size() << endl;
 		for(int i = origin; i < commNumber; ++i)
 			splits_communities[i] = splits_communities[i+1];
-//cerr << "delete3\n";
-		splits_communities[commNumber].assign(splits_communities[0].size(), 0);
-//cerr << "delete4\n";
 	}
 }
 
@@ -301,7 +269,7 @@ void RunCombo(Graph& G, int max_comunities)
 	G.CalcModMtrix();
 	G.SetCommunities(vector<int>(G.Size(), 0));
 	double currentMod = G.Modularity();
-	//cout << "Initial modularity: " << currentMod << endl;
+	//printf("Initial modularity: %6f\n", currentMod);
 	vector< vector<double> > moves(2, vector<double>(2, 0)); //results of splitting communities 
 	//vectors of boolean meaning that corresponding vertex should be moved to dest
 	vector< vector<int> > splits_communities(2, vector<int>(G.Size(), 0)); //best split vectors
@@ -339,6 +307,7 @@ void RunCombo(Graph& G, int max_comunities)
 				splits_communities[dest+1] = splits_communities[dest];
 			}
 		}
+
 		for(int i = 0; i < G.CommunityNumber() + (G.CommunityNumber() < max_comunities); ++i)
 		{
 			reCalc(G, moves, splits_communities, origin, i);
@@ -350,8 +319,6 @@ void RunCombo(Graph& G, int max_comunities)
 		}
 		DeleteEmptyCommunities(G, moves, splits_communities, origin); //remove origin community if empty
 		best_gain = BestGain(moves, origin, dest);
-		cerr << best_gain << "\n";
-		//moves.assign(moves.size(), vector<double>(moves.size(), 0));
 	}
 }
 
@@ -391,7 +358,7 @@ int main(int argc, char** argv)
 	RunCombo(G, max_comunities);
 
 	//cout << fileName << " " << G.Modularity() << endl;
-	cout << "Elapsed time is " << (double(clock() - startTime)/CLOCKS_PER_SEC) << endl;
+	//cout << "Elapsed time is " << (double(clock() - startTime)/CLOCKS_PER_SEC) << endl;
 
 	G.PrintCommunity(fileName.substr(0, fileName.rfind('.')) + "_comm_comboC++.txt");
 	cout << G.Modularity() << endl;
