@@ -34,6 +34,7 @@ using std::vector;
 using std::set;
 using std::max;
 using std::cout;
+using std::cerr;
 using std::endl;
 using std::min;
 
@@ -281,7 +282,9 @@ bool Graph::DeleteCommunityIfEmpty(int comm)
 				--m_communities[i];
 			comms.insert(m_communities[i]);
 		}
+		cerr << m_communityNumber << endl;
 		m_communityNumber = comms.size();
+		cerr << m_communityNumber << endl;
         return true;
 	}
 	return false;
